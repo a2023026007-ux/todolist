@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 flex justify-center items-start p-4 sm:p-6 md:p-10">
+
+    <!-- 메인 컨테이너 -->
+    <main class="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 sm:p-6 mt-4 sm:mt-8">
+        
+        <!-- 타이틀 및 상태 요약 -->
+        <header class="flex items-center justify-between mb-6">
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900">할 일 목록</h1>
+            <span id="todo-count" class="text-xs font-medium bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">
+                0개 남음
+            </span>
+        </header>
+
+        <!-- (1) 할 일 추가 폼 -->
+        <form id="todo-form" class="flex gap-2 mb-6">
+            <input 
+                type="text" 
+                id="todo-input" 
+                placeholder="새로운 할 일을 입력하세요..." 
+                class="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-slate-800 focus:ring-1 focus:ring-slate-800 text-sm transition-all placeholder:text-slate-400"
+                required
+            />
+            <button 
+                type="submit" 
+                class="px-4 py-2.5 bg-slate-900 text-white text-sm font-medium rounded-xl hover:bg-slate-800 active:scale-95 transition-all shadow-sm shrink-0"
+            >
+                추가
+            </button>
+        </form>
+
+        <!-- (5) 전체 / 진행 중 / 완료 필터 버튼 -->
+        <nav class="flex border-b border-slate-100 pb-3 mb-3 gap-1 text-xs sm:text-sm font-medium text-slate-500">
+            <button 
+                data-filter="all" 
+                class="filter-btn flex-1 py-1.5 rounded-lg text-slate-900 bg-slate-100 font-semibold transition-all"
+            >
+                전체
+            </button>
+            <button 
+                data-filter="active" 
+                class="filter-btn flex-1 py-1.5 rounded-lg hover:bg-slate-50 hover:text-slate-700 transition-all"
+            >
+                진행 중
+            </button>
+            <button 
+                data-filter="completed" 
+                class="filter-btn flex-1 py-1.5 rounded-lg hover:bg-slate-50 hover:text-slate-700 transition-all"
+            >
+                완료
+            </button>
+        </nav>
+
+        <!-- 할 일 목록 수신부 -->
+        <ul id="todo-list" class="space-y-1.5 min-h-[160px] max-h-[60vh] overflow-y-auto pr-0.5">
+            <!-- JavaScript를 통해 동적으로 로드됩니다 -->
+        </ul>
+
+    </main>
+
+    <script>
+        // DOM 요소 가져오기
+        const todoForm = document.getElementById('todo-form');
+        const todoInput = document.getElementById('todo-input');
+        const todoList = document.getElementById('todo-list');
+        const todoCount = document.getElementById('todo-count');
+        const filterBtns = document.querySelectorAll('.filter-btn');
+
+        // (4) localStorage로 데이터 저장/복원
+        let todos = JSON.parse(localStorage.getItem('todos_v2')) || [];
+        let currentFilter = 'all';
+
+        // 앱 초기화
+        function init() {
+            setupEventListeners();
+            renderTodos();
+        }
+
+        // 이벤트 리스너 설정
+        function setupEventListeners() {
+            // 할 일 추가
+            todoForm.addEventListener('submit', handleAddTodo);
+
+            // 필터링 버튼 클릭 이벤트
+            filterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterBtns.forEach(b => {
+                        b.classList.remove('bg-slate-100', 'text-slate-900', 'font-semibold');
+                        b.classList.add('hover:bg-slate-50', 'hover:text-slate-700');
+                    });
+                    btn.classList.add('bg-slate-100', 'text-slate-900', 'font-semibold');
+                    btn.classList.remove('hover:bg-slate-50', 'hover:text-slate-700');
+                    
+                    currentFilter = btn.dataset.filter;
+                    renderTodos();
+                });
+            });
+        }
+
+        // (1) 할 일 추가 핸들러
+        function handleAddTodo(e) {
+            e.preventDefault();
+            const text = todoInput.value.trim();
+            
+            if (text) {
+                const newTodo = {
+                    id: Date.now(),
+                    text: text,
+                    completed: false
+                };
+                
+                todos.unshift(newTodo); // 최신 항목이 맨 위에 오도록 추가
+                saveTodos();
+                todoInput.value = '';
+            }
+        }
+
+        // (2) 완료 체크/해제
+        function toggleTodo(id) {
+            todos = todos.map(todo => 
+                todo.id === id ? { ...todo, completed: !todo.completed } : todo
+            );
+            saveTodos();
+        }
+
+        // (3) 삭제
+        function deleteTodo(id) {
+            todos = todos.filter(todo => todo.id !== id);
+            saveTodos();
+        }
+
+        // (4) localStorage에 저장 후 목록 다시 그리기
+        function saveTodos() {
+            localStorage.setItem('todos_v2', JSON.stringify(todos));
+            renderTodos();
+        }
+
+        // (5) 필터에 따른 목록 구하기 및 화면 렌더링
+        function renderTodos() {
+            // 필터링 적용
+            const filteredTodos = todos.filter(todo => {
+                if (currentFilter === 'active') return !todo.completed;
+                if (currentFilter === 'completed') return todo.completed;
+                return true; // 'all'
+            });
+
+            // 남은 할 일 수 업데이트 (미완료 항목)
+            const activeCount = todos.filter(todo => !todo.completed).length;
+            todoCount.textContent = `${activeCount}개 남음`;
+
+            // 목록이 비어있는 경우 예외 처리
+            if (filteredTodos.length === 0) {
+                let emptyMessage = '할 일이 없습니다.';
+                if (currentFilter === 'active') emptyMessage = '진행 중인 할 일이 없습니다.';
+                if (currentFilter === 'completed') emptyMessage = '완료된 할 일이 없습니다.';
+
+                todoList.innerHTML = `
+                    <li class="py-12 text-center text-slate-400 text-sm flex flex-col items-center justify-center gap-2">
+                        <svg class="w-8 h-8 stroke-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        <span>${emptyMessage}</span>
+                    </li>
+                `;
+                return;
+            }
+
+            // HTML 생성
+            todoList.innerHTML = filteredTodos.map(todo => `
+                <li class="group flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100">
+                    <label class="flex items-center gap-3 cursor-pointer flex-1 min-w-0 pr-2">
+                        <input 
+                            type="checkbox" 
+                            ${todo.completed ? 'checked' : ''} 
+                            onchange="toggleTodo(${todo.id})"
+                            class="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-800 cursor-pointer accent-slate-900"
+                        />
+                        <span class="text-sm truncate select-none ${todo.completed ? 'line-through text-slate-400' : 'text-slate-700'}">
+                            ${escapeHtml(todo.text)}
+                        </span>
+                    </label>
+                    <button 
+                        onclick="deleteTodo(${todo.id})" 
+                        class="text-slate-400 hover:text-red-500 p-1 rounded-lg opacity-80 sm:opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
+                        aria-label="삭제"
+                    >
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </li>
+            `).join('');
+        }
+
+        // HTML 이스케이프 (XSS 방지)
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.innerText = text;
+            return div.innerHTML;
+        }
+
+        // 앱 시작
+        init();
+    </script>
+</body>
+</html>
